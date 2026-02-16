@@ -172,11 +172,11 @@ and `b`. The points `a` and `b` can be either `SVector`s or a `Tuple`.
 The parametrization of the line is given by `f(u) = a + u(b - a)`, where `0 ≤ u
 ≤ 1`.
 """
-function line(a, b)
+function line(a, b; kwargs...)
     a, b = SVector(a), SVector(b)
     f = (u) -> a + u[1] * (b - a)
     d = HyperRectangle(SVector(0.0), SVector(1.0))
-    return GeometricEntity(; domain = d, parametrization = f)
+    return GeometricEntity(; domain = d, parametrization = f, kwargs...)
 end
 
 """
