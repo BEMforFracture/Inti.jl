@@ -20,11 +20,14 @@ using StaticArrays
 using Printf
 using TOML
 using Richardson
+using TimerOutputs
 
 using ElementaryPDESolutions: ElementaryPDESolutions
 using SpecialFunctions: SpecialFunctions
 using Bessels: Bessels # faster than SpecialFunctions for Bessel functions with real args
 using HAdaptiveIntegration: HAdaptiveIntegration
+
+const INTI_TIMER = TimerOutput()
 
 # helper functions
 include("utils.jl")
