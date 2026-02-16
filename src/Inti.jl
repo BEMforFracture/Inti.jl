@@ -60,4 +60,6 @@ include("gmsh_api.jl")
 # API
 include("api.jl")
 
+export INTI_TIMER
+
 end
