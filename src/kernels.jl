@@ -528,24 +528,23 @@ end
 function (DL::DoubleLayerKernel{T, <:Elastostatic{N}})(target, source)::T where {N, T}
     μ, λ = DL.op.μ, DL.op.λ
     ν = λ / (2 * (μ + λ))
-    x = coords(target)
-    y = coords(source)
     ny = normal(source)
-    ν = λ / (2 * (μ + λ))
-    r = x .- y
+    r = coords(target) .- coords(source)
     d = norm(r)
     d == 0 && return zero(T)
-    RRT = r * transpose(r) # r ⊗ rᵗ
+    id2 = inv(d * d)
+    RRT = r * transpose(r)
     drdn = -dot(r, ny) / d
+    ν1 = 1 - 2ν
     if N == 2
-        return -1 / (4π * (1 - ν) * d) * (
-            drdn * ((1 - 2ν) * I + 2 * RRT / d^2) +
-                (1 - 2ν) / d * (r * transpose(ny) - ny * transpose(r))
+        return -inv(4π * (1 - ν) * d) * (
+            drdn * (ν1 * I + 2 * id2 * RRT) +
+                ν1 / d * (r * transpose(ny) - ny * transpose(r))
         )
     elseif N == 3
-        return -1 / (8π * (1 - ν) * d^2) * (
-            drdn * ((1 - 2 * ν) * I + 3 * RRT / d^2) +
-                (1 - 2 * ν) / d * (r * transpose(ny) - ny * transpose(r))
+        return -id2 / (8π * (1 - ν)) * (
+            drdn * (ν1 * I + 3 * id2 * RRT) +
+                ν1 / d * (r * transpose(ny) - ny * transpose(r))
         )
     end
 end
@@ -553,71 +552,56 @@ end
 function (ADL::AdjointDoubleLayerKernel{T, <:Elastostatic{N}})(target, source)::T where {N, T}
     μ, λ = ADL.op.μ, ADL.op.λ
     ν = λ / (2 * (μ + λ))
-    x = coords(target)
     nx = normal(target)
-    y = coords(source)
-    ν = λ / (2 * (μ + λ))
-    r = x .- y
+    r = coords(target) .- coords(source)
     d = norm(r)
     d == 0 && return zero(T)
-    RRT = r * transpose(r) # r ⊗ rᵗ
+    id2 = inv(d * d)
+    RRT = r * transpose(r)
     drdn = -dot(r, nx) / d
+    ν1 = 1 - 2ν
+    # ADL = -transpose(DL with ny→nx), which flips the sign of the antisymmetric part
     if N == 2
-        out =
-            -1 / (4π * (1 - ν) * d) * (
-            drdn * ((1 - 2ν) * I + 2 * RRT / d^2) +
-                (1 - 2ν) / d * (r * transpose(nx) - nx * transpose(r))
+        return inv(4π * (1 - ν) * d) * (
+            drdn * (ν1 * I + 2 * id2 * RRT) +
+                ν1 / d * (nx * transpose(r) - r * transpose(nx))
         )
-        return -transpose(out)
     elseif N == 3
-        out =
-            -1 / (8π * (1 - ν) * d^2) * (
-            drdn * ((1 - 2 * ν) * I + 3 * RRT / d^2) +
-                (1 - 2 * ν) / d * (r * transpose(nx) - nx * transpose(r))
+        return id2 / (8π * (1 - ν)) * (
+            drdn * (ν1 * I + 3 * id2 * RRT) +
+                ν1 / d * (nx * transpose(r) - r * transpose(nx))
         )
-        return -transpose(out)
     end
 end
 
 function (HS::HyperSingularKernel{T, <:Elastostatic{N}})(target, source) where {N, T}
     μ, λ = HS.op.μ, HS.op.λ
     ν = λ / (2 * (μ + λ))
-    x = coords(target)
     nx = normal(target)
-    y = coords(source)
     ny = normal(source)
-    r = x .- y
+    r = coords(target) .- coords(source)
     d = norm(r)
     d == 0 && return zero(T)
-    RRT = r * transpose(r) # r ⊗ rᵗ
-    drdn = dot(r, ny) / d
+    rdnx = dot(r, nx)
+    rdny = dot(r, ny)
+    nxdny = dot(nx, ny)
     if N == 2
-        return μ / (2π * (1 - ν) * d^2) * (
-            2 * drdn / d * (
-                (1 - 2ν) * nx * transpose(r) + ν * (dot(r, nx) * I + r * transpose(nx)) -
-                    4 * dot(r, nx) * RRT / d^2
-            ) +
-                2 * ν / d^2 * (dot(r, nx) * ny * transpose(r) + dot(nx, ny) * RRT) +
-                (1 - 2 * ν) * (
-                2 / d^2 * dot(r, nx) * r * transpose(ny) +
-                    dot(nx, ny) * I +
-                    ny * transpose(nx)
-            ) - (1 - 4ν) * nx * transpose(ny)
-        )
+        c = μ / (2π * (1 - ν) * d^2)
+        α = 2 * rdny / d^2
+        # Decompose as: c * (r⊗vr + nx⊗vnx + ny⊗vny + a_diag * I)
+        vr = (-4α * rdnx + 2ν * nxdny) / d^2 * r + α * ν * nx + (1 - 2ν) * 2 * rdnx / d^2 * ny
+        vnx = (1 - 2ν) * α * r - (1 - 4ν) * ny
+        vny = 2ν * rdnx / d^2 * r + (1 - 2ν) * nx
+        a_diag = α * ν * rdnx + (1 - 2ν) * nxdny
     elseif N == 3
-        return μ / (4π * (1 - ν) * d^3) * (
-            3 * drdn / d * (
-                (1 - 2ν) * nx * transpose(r) + ν * (dot(r, nx) * I + r * transpose(nx)) -
-                    5 * dot(r, nx) * RRT / d^2
-            ) +
-                3 * ν / d^2 * (dot(r, nx) * ny * transpose(r) + dot(nx, ny) * RRT) +
-                (1 - 2 * ν) * (
-                3 / d^2 * dot(r, nx) * r * transpose(ny) +
-                    dot(nx, ny) * I +
-                    ny * transpose(nx)
-            ) - (1 - 4ν) * nx * transpose(ny)
-        )
+        c = μ / (4π * (1 - ν) * d^3)
+        α = 3 * rdny / d^2
+        vr = (-5α * rdnx + 3ν * nxdny) / d^2 * r + α * ν * nx + (1 - 2ν) * 3 * rdnx / d^2 * ny
+        vnx = (1 - 2ν) * α * r - (1 - 4ν) * ny
+        vny = 3ν * rdnx / d^2 * r + (1 - 2ν) * nx
+        a_diag = α * ν * rdnx + (1 - 2ν) * nxdny
     end
+    return c * (r * transpose(vr) + nx * transpose(vnx) + ny * transpose(vny) + a_diag * I)
 end
 
 ################################################################################
