@@ -51,6 +51,7 @@ include("quadrature.jl")
 include("kernels.jl")
 include("nystrom.jl")
 include("adaptive_correction.jl")
+include("embedded_correction.jl")
 include("bdim.jl")
 include("vdim.jl")
 

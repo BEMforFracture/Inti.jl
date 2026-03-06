@@ -69,7 +69,6 @@ function _fill_block_with_embedded_correction!(
     Y = data.Y
     K = data.kernel
     msh = mesh(Y)
-    
     Xqnodes = X
     Yqnodes = collect(Y)
     

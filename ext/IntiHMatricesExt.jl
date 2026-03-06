@@ -21,12 +21,7 @@ function Inti.assemble_hmatrix(
     # Prepare correction callback if requested
     correction_callback = if embedded_correction
         # Compute correction parameters
-        if isnothing(maxdist) || isnothing(correction_rtol) || isnothing(correction_atol)
-            maxdist_, rtol_, atol_ = Inti.local_correction_dist_and_tol(iop)
-            maxdist = isnothing(maxdist) ? maxdist_ : maxdist
-            correction_rtol = isnothing(correction_rtol) ? rtol_ : correction_rtol
-            correction_atol = isnothing(correction_atol) ? atol_ : correction_atol
-        end
+        _, rtol_corr, atol_corr = Inti.local_correction_dist_and_tol(iop)
         
         # Build quadrature dictionary
         msh = Inti.mesh(Inti.source(iop))
@@ -34,15 +29,15 @@ function Inti.assemble_hmatrix(
         for E in Inti.element_types(msh)
             ref_domain = Inti.reference_domain(E)
             quads = (
-                nearfield_quad = Inti.adaptive_quadrature(ref_domain; rtol=correction_rtol, atol=correction_atol),
-                radial_quad = Inti.adaptive_quadrature(Inti.ReferenceLine(); rtol=correction_rtol, atol=correction_atol),
-                angular_quad = Inti.adaptive_quadrature(Inti.ReferenceLine(); rtol=correction_rtol, atol=correction_atol),
+                nearfield_quad = Inti.adaptive_quadrature(ref_domain; rtol=rtol_corr, atol=atol_corr),
+                radial_quad = Inti.adaptive_quadrature(Inti.ReferenceLine(); rtol=rtol_corr, atol=atol_corr),
+                angular_quad = Inti.adaptive_quadrature(Inti.ReferenceLine(); rtol=rtol_corr, atol=atol_corr),
             )
             quads_dict[E] = quads
         end
         
         # Create the callback
-        Inti.create_correction_callback(iop, maxdist, quads_dict)
+        Inti.create_correction_callback(iop, quads_dict)
     else
         nothing
     end
