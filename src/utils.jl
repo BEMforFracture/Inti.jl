@@ -104,12 +104,12 @@ end
 
 Return the normal vector of `el` at the parametric coordinate `x̂`.
 """
-function normal(el, x)
+function normal(el, x, s = 1)
     jac = jacobian(el, x)
     N, M = size(jac)
     msg = "computing the normal vector requires the element to be of co-dimension one."
     @assert (N - M == 1) msg
-    return _normal(jac)
+    return _normal(jac, s)
 end
 
 """

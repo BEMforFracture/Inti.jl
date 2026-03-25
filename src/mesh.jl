@@ -548,10 +548,10 @@ entities(msh::SubMesh) = entities(domain(msh))
 
 function ent2etags(msh::SubMesh)
     par_ent2etags = ent2etags(parent(msh))
-    g2l = Dict{Int, Int}() # global (parent) to local element index
+    g2l = Dict{Tuple{DataType, Int}, Int}() # global (parent) to local element index, per element type
     for (E, tags) in msh.etype2etags
         for (iloc, iglob) in enumerate(tags)
-            g2l[iglob] = iloc
+            g2l[(E, iglob)] = iloc
         end
     end
     new_ent2etags = empty(par_ent2etags)
@@ -559,7 +559,13 @@ function ent2etags(msh::SubMesh)
         par_etags = par_ent2etags[ent]
         new_ent2etags[ent] = etags = empty(par_etags)
         for (E, tags) in par_etags
-            etags[E] = [g2l[t] for t in tags]
+            local_tags = Int[]
+            for t in tags
+                key = (E, t)
+                haskey(g2l, key) || continue
+                push!(local_tags, g2l[key])
+            end
+            isempty(local_tags) || (etags[E] = local_tags)
         end
     end
     return new_ent2etags
