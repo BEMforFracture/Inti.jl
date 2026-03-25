@@ -210,8 +210,8 @@ end
 		el = el_iter[n]
 		ori = orientation[n]
 		jglob = view(el2qtags, :, n)
-		# inear = union(nearlist[n], jglob) # make sure to include nearfield nodes AND the element nodes
-		inear = nearlist[n]
+		inear = union(nearlist[n], jglob) # make sure to include nearfield nodes AND the element nodes
+		# inear = nearlist[n]
 		for i in inear
 			xnode = Xqnodes[i]
 			# closest quadrature node
