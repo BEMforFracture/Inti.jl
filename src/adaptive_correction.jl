@@ -61,49 +61,6 @@ quadrature rules for the radial and angular directions when computing the singul
 correction in polar coordinates on the reference domain. You can then call
 `adaptive_correction(iop, maxdist, quads_dict)` to use the custom quadrature.
 """
-struct _MaxSubdivContextLogger{L, F} <: Base.CoreLogging.AbstractLogger
-	parent::L
-	onwarn::F
-end
-
-Base.CoreLogging.min_enabled_level(logger::_MaxSubdivContextLogger) =
-	Base.CoreLogging.min_enabled_level(logger.parent)
-
-Base.CoreLogging.shouldlog(logger::_MaxSubdivContextLogger, args...) =
-	Base.CoreLogging.shouldlog(logger.parent, args...)
-
-Base.CoreLogging.catch_exceptions(logger::_MaxSubdivContextLogger) =
-	Base.CoreLogging.catch_exceptions(logger.parent)
-
-function Base.CoreLogging.handle_message(
-	logger::_MaxSubdivContextLogger,
-	level,
-	message,
-	_module,
-	group,
-	id,
-	file,
-	line;
-	kwargs...,
-)
-	msg = string(message)
-	if level == Base.CoreLogging.Warn &&
-		occursin("maximum number of subdivide reached", msg)
-		logger.onwarn(msg)
-	end
-	return Base.CoreLogging.handle_message(
-		logger.parent,
-		level,
-		message,
-		_module,
-		group,
-		id,
-		file,
-		line;
-		kwargs...,
-	)
-end
-
 function adaptive_correction(
 	iop::IntegralOperator;
 	maxdist = nothing,
@@ -206,12 +163,18 @@ end
 	nel = length(el_iter)
 	lck = Threads.SpinLock()
 	# lck = ReentrantLock()
+	function near_indices(X, Y, n, jglob)
+		if X == Y
+			return union(nearlist[n], jglob) # make sure to include nearfield nodes AND the element nodes
+		else
+			return nearlist[n]
+		end
+	end
 	@maybe_threads threads for n in 1:nel
 		el = el_iter[n]
 		ori = orientation[n]
 		jglob = view(el2qtags, :, n)
-		inear = union(nearlist[n], jglob) # make sure to include nearfield nodes AND the element nodes
-		# inear = nearlist[n]
+		inear = near_indices(X, Y, n, jglob)
 		for i in inear
 			xnode = Xqnodes[i]
 			# closest quadrature node
@@ -221,35 +184,18 @@ end
 			)
 			x̂nearest = x̂[j]
 			dmin > nearfield_distance && continue
-			warn_logger = _MaxSubdivContextLogger(
-				Base.CoreLogging.current_logger(),
-				(_) -> @warn(
-					"adaptive quadrature reached maxsubdiv in adaptive_correction",
-					target_qnode = i,
-					coords = coords(xnode),
-					source_element_id = n,
-					source_element = el,
-					nearest_local_qnode = j,
-					coords_local_qnode = x̂nearest,
-					nearest_global_qtag = jglob[j],
-					dmin = dmin,
-					element_type = E,
-				),
-			)
 			# If singular, use Guiggiani's method. Otherwise use an oversampled quadrature
 			if iszero(dmin)
-				W = Base.CoreLogging.with_logger(warn_logger) do
-					guiggiani_singular_integral(
-						K,
-						L,
-						x̂nearest,
-						el,
-						ori,
-						quads.radial_quad,
-						quads.angular_quad,
-						sorder,
-					)
-				end
+				W = guiggiani_singular_integral(
+					K,
+					L,
+					x̂nearest,
+					el,
+					ori,
+					quads.radial_quad,
+					quads.angular_quad,
+					sorder,
+				)
 			else
 				integrand = (ŷ) -> begin
 					y = el(ŷ)
@@ -260,9 +206,7 @@ end
 					v = L(ŷ)
 					map(v -> M * v, v) * τ′
 				end
-				W = Base.CoreLogging.with_logger(warn_logger) do
-					quads.nearfield_quad(integrand)
-				end
+				W = quads.nearfield_quad(integrand)
 			end
 			@lock lck for (k, j) in enumerate(jglob)
 				qx, qy = Xqnodes[i], Yqnodes[j]
@@ -613,20 +557,7 @@ function _regular_integration_errors(
 			iszero(dir) && continue
 			k = abs(dir)
 			x = setindex(x₀, x₀[k] + sign(N) * cc * h, k)
-			warn_logger = _MaxSubdivContextLogger(
-				Base.CoreLogging.current_logger(),
-				(_) -> @warn(
-					"adaptive quadrature reached maxsubdiv in local_correction_dist_and_tol",
-					element_idx = element_idx,
-					element_type = element_type,
-					distance_iter = cc,
-					direction = dir,
-					probe_point = x,
-				),
-			)
-			I = Base.CoreLogging.with_logger(warn_logger) do
-				qref(ŷ -> f(x, ŷ))
-			end
+			I = qref(ŷ -> f(x, ŷ))
 			Ia = qreg(ŷ -> f(x, ŷ))
 			abs_er = max(abs_er, norm(Ia - I, Inf))
 			rel_er = max(er, norm(Ia - I, Inf) / norm(I, Inf))
