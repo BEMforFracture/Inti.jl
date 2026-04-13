@@ -119,9 +119,33 @@ order(::Fejer{N}) where {N} = N - 1
 end
 
 """
+    struct PeriodicTrapezoid{N}
+
+N-points periodic trapezoidal quadrature rule for integrating a function over `[0,1]`. Adpated when the integrand is periodic of period 1.
+"""
+
+struct PeriodicTrapezoid{N} <: ReferenceQuadrature{ReferenceLine} end
+
+PeriodicTrapezoid(n::Int) = PeriodicTrapezoid{n}()
+
+PeriodicTrapezoid(; order::Int) = PeriodicTrapezoid(order + 1)
+
+order(::PeriodicTrapezoid{N}) where {N} = N - 1
+
+@generated function (q::PeriodicTrapezoid{N})() where {N}
+    if N == 1
+        return SVector(SVector(0.5)), SVector(1.0)
+    end
+    h = 1 / (N - 1)
+    x = svector(i -> SVector((i - 1) * h), N)
+    w = svector(i -> (i == 1 || i == N) ? h / 2 : h, N)
+    return x, w
+end
+
+"""
     struct Trapezoid{N}
 
-N-points trapezoidal quadrature rule for integrating a function over `[0,1]`.
+N-points trapezoidal quadrature rule for integrating a function over `[0,1]`. Not adapted when the integrand is periodic of period 1.
 """
 
 struct Trapezoid{N} <: ReferenceQuadrature{ReferenceLine} end
@@ -133,9 +157,6 @@ Trapezoid(; order::Int) = Trapezoid(order + 1)
 order(::Trapezoid{N}) where {N} = N - 1
 
 @generated function (q::Trapezoid{N})() where {N}
-    if N == 1
-        return SVector(SVector(0.5)), SVector(1.0)
-    end
     h = 1 / (N - 1)
     x = svector(i -> SVector((i - 1) * h), N)
     w = svector(i -> h, N)
