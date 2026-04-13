@@ -119,6 +119,29 @@ order(::Fejer{N}) where {N} = N - 1
 end
 
 """
+    struct Trapezoid{N}
+
+N-points trapezoidal quadrature rule for integrating a function over `[0,1]`.
+"""
+
+struct Trapezoid{N} <: ReferenceQuadrature{ReferenceLine} end
+
+Trapezoid(n::Int) = Trapezoid{n}()
+
+Trapezoid(; order::Int) = Trapezoid(order + 1)
+
+order(::Trapezoid{N}) where {N} = N - 1
+
+@generated function (q::Trapezoid{N})() where {N}
+    if N == 1
+        return SVector(SVector(0.5)), SVector(1.0)
+    end
+    x = svector(i -> SVector((i - 1) / (N - 1)), N)
+    w = svector(i -> (i == 1 || i == N) ? 0.5 / (N - 1) : 1 / (N - 1), N)
+    return x, w
+end
+
+"""
     struct GaussLegendre{N,T}
 
 `N`-point Gauss-Legendre quadrature rule for integrating a function over
