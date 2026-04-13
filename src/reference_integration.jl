@@ -136,8 +136,9 @@ order(::Trapezoid{N}) where {N} = N - 1
     if N == 1
         return SVector(SVector(0.5)), SVector(1.0)
     end
-    x = svector(i -> SVector((i - 1) / (N - 1)), N)
-    w = svector(i -> (i == 1 || i == N) ? 0.5 / (N - 1) : 1 / (N - 1), N)
+    h = 1 / (N - 1)
+    x = svector(i -> SVector((i - 1) * h), N)
+    w = svector(i -> h, N)
     return x, w
 end
 
