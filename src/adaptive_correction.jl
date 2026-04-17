@@ -300,6 +300,7 @@ function guiggiani_singular_integral(
 		zero(F(1.0e-8, 0.0))
 	end
 	# integrate
+	nodes = SVector{2, Float64}[]
 	for (theta_min, theta_max, rho_func) in polar_decomposition(ref_shape, x̂)
 		delta_theta = theta_max - theta_min
 		I_theta = quad_theta() do (theta_ref,)
@@ -315,6 +316,8 @@ function guiggiani_singular_integral(
 			)
 			I_rho = quad_rho() do (rho_ref,)
 				rho = rho_ref * rho_max
+				ŷ = x̂ + rho * SVector(cos(theta), sin(theta))
+				push!(nodes, ŷ)
 				# compute F(rho, theta) - F₋₁ / rho - F₋₂ / rho^2, but ignore terms that are
 				# known to be zero
 				if P == -2
@@ -340,7 +343,7 @@ function guiggiani_singular_integral(
 		I_theta *= delta_theta
 		acc += I_theta
 	end
-	return acc
+	return acc, nodes
 end
 
 function guiggiani_singular_integral(
