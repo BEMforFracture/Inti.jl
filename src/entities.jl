@@ -39,7 +39,13 @@ function (k::EntityKey)(x)
 end
 
 function Base.show(io::IO, k::EntityKey)
-    e = global_get_entity(k)
+    e = nothing
+    try 
+        e = global_get_entity(k)
+    catch
+        print(io, "EntityKey: ($(k.dim), $(k.tag)) => < geometric entity not found >")
+        return io
+    end
     print(io, "EntityKey: ($(k.dim), $(k.tag)) => $e")
     return io
 end
@@ -295,6 +301,14 @@ all entities created in a given session.
 const ENTITIES = Dict{EntityKey, GeometricEntity}()
 
 clear_entities!() = empty!(ENTITIES)
+
+function clear_entities!(f)
+    unwanted_ents = filter!(f, ENTITIES)
+    for (k, v) in unwanted_ents
+        delete!(ENTITIES, k)
+    end
+    return
+end
 
 function global_add_entity!(ent::GeometricEntity)
     d, t = geometric_dimension(ent), tag(ent)
